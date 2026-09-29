@@ -20,12 +20,8 @@ def test_subject_and_body():
     assert "Status = In Process or Completed" in body
     assert "SUKUT GPS Automation Team" in body
     assert "Sukut Drone Automation" not in body
-    assert "><(((º>   ><(((º>   RK   ><(((º>" in body
-    assert "><(((º>            ><(((º>          RK               ><(((º>" not in body
-    assert body.endswith(
-        "SUKUT GPS Automation Team\n"
-        "><(((º>   ><(((º>   RK   ><(((º>\n"
-    )
+    assert "><(((º>" not in body
+    assert body.endswith("SUKUT GPS Automation Team\n")
 
 
 def test_email_disabled(monkeypatch, tmp_path: Path):
@@ -56,6 +52,7 @@ def test_send_report_email_uses_attachment(tmp_path: Path, monkeypatch):
 
     def fake_send(config, message):
         captured["to"] = config.to_address
+        captured["cc"] = message.get("Cc")
         captured["from"] = config.from_address
         captured["subject"] = message["Subject"]
         captured["body"] = message.get_body(preferencelist=("plain",)).get_content()
@@ -68,14 +65,12 @@ def test_send_report_email_uses_attachment(tmp_path: Path, monkeypatch):
         date(2026, 9, 30),
         smtp_send=fake_send,
     )
-    assert status == "sent to rkolt@sukut.com"
+    assert status == "sent to rkolt@sukut.com (cc: meklund@sukut.com)"
     assert captured["to"] == "rkolt@sukut.com"
+    assert captured["cc"] == "meklund@sukut.com"
     assert captured["subject"] == "Drone Billing Report - September 2026"
     assert captured["filename"] == "Drone_Billing_Report_2026-09.xlsx"
-    assert captured["body"].endswith(
-        "SUKUT GPS Automation Team\n"
-        "><(((º>   ><(((º>   RK   ><(((º>\n"
-    )
+    assert captured["body"].endswith("SUKUT GPS Automation Team\n")
 
 
 def test_load_email_config_smtp_aliases(monkeypatch):
@@ -88,6 +83,7 @@ def test_load_email_config_smtp_aliases(monkeypatch):
     monkeypatch.setenv("SMTP_PORT", "587")
     config = load_email_config()
     assert config.to_address == "rkolt@sukut.com"
+    assert config.cc_address == "meklund@sukut.com"
     assert config.smtp_user == "sukut.rtk.bases@gmail.com"
     assert config.smtp_host == "smtp.gmail.com"
     assert config.smtp_port == 587

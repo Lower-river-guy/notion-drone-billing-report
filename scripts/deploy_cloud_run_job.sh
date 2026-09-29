@@ -10,6 +10,7 @@ GCS_BUCKET="${GCS_BUCKET:-trimble-data-bucket-rk}"
 GCS_PREFIX="${GCS_PREFIX:-notion-drone-billing-report/}"
 NOTION_SECRET="${NOTION_SECRET:-Notion_Google_Cloud_Sync}"
 REPORT_EMAIL_TO="${REPORT_EMAIL_TO:-rkolt@sukut.com}"
+REPORT_EMAIL_CC="${REPORT_EMAIL_CC:-meklund@sukut.com}"
 # Project number from existing Cloud Run service tcc-work-order-builder-564809734796
 PROJECT_NUMBER="${GCP_PROJECT_NUMBER:-564809734796}"
 SCHEDULER_SA="${SCHEDULER_SA:-${PROJECT_NUMBER}-compute@developer.gserviceaccount.com}"
@@ -55,7 +56,7 @@ else
   echo "WARNING: No GMAIL_APP_PASSWORD (or alias) secret found. Job email will fail unless credentials are provided another way." >&2
 fi
 
-ENV_VARS="GCS_BUCKET=${GCS_BUCKET},GCS_PREFIX=${GCS_PREFIX},REPORT_EMAIL_TO=${REPORT_EMAIL_TO},OUTPUT_DIR=/tmp"
+ENV_VARS="GCS_BUCKET=${GCS_BUCKET},GCS_PREFIX=${GCS_PREFIX},REPORT_EMAIL_TO=${REPORT_EMAIL_TO},REPORT_EMAIL_CC=${REPORT_EMAIL_CC},OUTPUT_DIR=/tmp"
 
 echo "Deploying Cloud Run Job ${JOB_NAME} from source..."
 gcloud run jobs deploy "${JOB_NAME}" \

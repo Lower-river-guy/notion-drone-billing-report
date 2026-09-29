@@ -10,9 +10,8 @@ from datetime import date
 from email.message import EmailMessage
 from pathlib import Path
 
-from drone_billing.logging_utils import BANNER
-
 DEFAULT_RECIPIENT = "rkolt@sukut.com"
+DEFAULT_CC = "meklund@sukut.com"
 DEFAULT_SMTP_HOST = "smtp.gmail.com"
 DEFAULT_SMTP_PORT = 587
 
@@ -20,6 +19,7 @@ DEFAULT_SMTP_PORT = 587
 @dataclass(frozen=True)
 class EmailConfig:
     to_address: str
+    cc_address: str
     from_address: str
     smtp_host: str
     smtp_port: int
@@ -34,6 +34,7 @@ def email_enabled() -> bool:
 
 def load_email_config() -> EmailConfig:
     to_address = (os.environ.get("REPORT_EMAIL_TO") or DEFAULT_RECIPIENT).strip()
+    cc_address = (os.environ.get("REPORT_EMAIL_CC", DEFAULT_CC) or "").strip()
     smtp_user = (
         os.environ.get("GMAIL_EMAIL")
         or os.environ.get("SMTP_USER")
@@ -66,6 +67,7 @@ def load_email_config() -> EmailConfig:
         )
     return EmailConfig(
         to_address=to_address,
+        cc_address=cc_address,
         from_address=from_address,
         smtp_host=smtp_host,
         smtp_port=smtp_port,
@@ -103,7 +105,6 @@ def build_body(billing_month: str, start: date, end: date) -> str:
         f"- Flight Date within the billing period\n"
         f"\n"
         f"SUKUT GPS Automation Team\n"
-        f"{BANNER}\n"
     )
 
 
@@ -122,6 +123,8 @@ def send_report_email(
     config = load_email_config()
     message = EmailMessage()
     message["To"] = config.to_address
+    if config.cc_address:
+        message["Cc"] = config.cc_address
     message["From"] = config.from_address
     message["Subject"] = build_subject(billing_month)
     message.set_content(build_body(billing_month, start, end))
@@ -136,6 +139,8 @@ def send_report_email(
 
     sender = smtp_send or _smtp_send
     sender(config, message)
+    if config.cc_address:
+        return f"sent to {config.to_address} (cc: {config.cc_address})"
     return f"sent to {config.to_address}"
 
 

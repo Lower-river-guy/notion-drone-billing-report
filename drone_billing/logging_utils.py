@@ -1,4 +1,4 @@
-"""Logging helpers and startup banner."""
+"""Logging helpers and startup signature."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import logging
 import sys
 from typing import Any
 
-BANNER = r"><(((º>   ><(((º>   RK   ><(((º>"
+TEAM_SIGNATURE = "SUKUT GPS Automation Team"
 
 
 def configure_logging() -> logging.Logger:
@@ -20,7 +20,7 @@ def configure_logging() -> logging.Logger:
 
 
 def print_banner(logger: logging.Logger) -> None:
-    logger.info(BANNER)
+    logger.info(TEAM_SIGNATURE)
 
 
 def log_structured(logger: logging.Logger, fields: dict[str, Any]) -> None:

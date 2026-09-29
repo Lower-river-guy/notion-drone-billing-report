@@ -111,6 +111,7 @@ Tier 1 is billed at **$2,500.00** per flight. That is the authoritative charge e
 | `GCS_BUCKET` | No | If set, upload report (example: `trimble-data-bucket-rk`) |
 | `GCS_PREFIX` | No | Default: `notion-drone-billing-report/` |
 | `REPORT_EMAIL_TO` | No | Default production recipient: `rkolt@sukut.com` |
+| `REPORT_EMAIL_CC` | No | Default CC: `meklund@sukut.com`. Set empty to omit CC. |
 | `REPORT_EMAIL_ENABLED` | No | Default `true`. Set `false` to skip sending. |
 | `GMAIL_EMAIL` | Yes if email enabled | SMTP username (Secret Manager). Alias: `SMTP_USER` |
 | `GMAIL_APP_PASSWORD` | Yes if email enabled | SMTP password (Secret Manager). Alias: `SMTP_PASS` |
@@ -125,9 +126,10 @@ SMTP credentials are **never** hard-coded. Do not commit app passwords.
 After a successful, validated report (and GCS upload when enabled), the job emails:
 
 - **To:** `rkolt@sukut.com` (override with `REPORT_EMAIL_TO`)
+- **Cc:** `meklund@sukut.com` (override with `REPORT_EMAIL_CC`; set empty to omit)
 - **Subject:** `Drone Billing Report - {Month} {Year}` (e.g. `Drone Billing Report - September 2026`)
 - **Attachment:** `Drone_Billing_Report_YYYY-MM.xlsx`
-- **Body:** billing period plus “Status = In Process or Completed”, signed `SUKUT GPS Automation Team` with the RK fish banner (`><(((º>   ><(((º>   RK   ><(((º>`)
+- **Body:** billing period plus “Status = In Process or Completed”, signed `SUKUT GPS Automation Team`
 
 Failure during Notion query, month filtering, Excel generation, validation, or GCS upload (when GCS is enabled) skips the normal billing email and exits non-zero.
 
@@ -139,7 +141,7 @@ Failure during Notion query, month filtering, Excel generation, validation, or G
 
 ```
 --set-secrets=NOTION_TOKEN=Notion_Google_Cloud_Sync:latest,GMAIL_EMAIL=GMAIL_EMAIL:latest,GMAIL_APP_PASSWORD=GMAIL_APP_PASSWORD:latest
---set-env-vars=GCS_BUCKET=trimble-data-bucket-rk,GCS_PREFIX=notion-drone-billing-report/,REPORT_EMAIL_TO=rkolt@sukut.com
+--set-env-vars=GCS_BUCKET=trimble-data-bucket-rk,GCS_PREFIX=notion-drone-billing-report/,REPORT_EMAIL_TO=rkolt@sukut.com,REPORT_EMAIL_CC=meklund@sukut.com
 ```
 
 ## Local testing
@@ -178,7 +180,7 @@ gcloud run jobs deploy "${JOB_NAME}" \
   --region "${REGION}" \
   --project "${PROJECT_ID}" \
   --set-secrets="NOTION_TOKEN=Notion_Google_Cloud_Sync:latest,GMAIL_EMAIL=GMAIL_EMAIL:latest,GMAIL_APP_PASSWORD=GMAIL_APP_PASSWORD:latest" \
-  --set-env-vars="GCS_BUCKET=trimble-data-bucket-rk,GCS_PREFIX=notion-drone-billing-report/,REPORT_EMAIL_TO=rkolt@sukut.com" \
+  --set-env-vars="GCS_BUCKET=trimble-data-bucket-rk,GCS_PREFIX=notion-drone-billing-report/,REPORT_EMAIL_TO=rkolt@sukut.com,REPORT_EMAIL_CC=meklund@sukut.com" \
   --max-retries=1 \
   --task-timeout=30m
 ```
@@ -213,7 +215,7 @@ Buckets are not made public.
 
 ## Logging
 
-On startup the job prints the RK fish banner, then JSON structured logs including version, billing month, completed vs In Process counts, billable vs review, month total, output path, GCS status, and email delivery status.
+On startup the job logs `SUKUT GPS Automation Team`, then JSON structured logs including version, billing month, completed vs In Process counts, billable vs review, month total, output path, GCS status, and email delivery status.
 
 ## Troubleshooting
 
