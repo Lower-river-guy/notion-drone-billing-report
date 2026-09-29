@@ -24,4 +24,15 @@ def print_banner(logger: logging.Logger) -> None:
 
 
 def log_structured(logger: logging.Logger, fields: dict[str, Any]) -> None:
+    logger.info("Notion Drone Billing Report")
+    logger.info("Version: %s", fields.get("version", ""))
+    logger.info("Billing Month: %s", fields.get("billing_month", ""))
+    logger.info("Flights Found: %s", fields.get("flights_found", ""))
+    logger.info("Completed Flights: %s", fields.get("completed_flights", ""))
+    logger.info("Billable Flights: %s", fields.get("billable_flights", ""))
+    logger.info("Review Required: %s", fields.get("review_required", ""))
+    logger.info("Output File: %s", fields.get("output_file", ""))
+    logger.info("GCS Upload Status: %s", fields.get("gcs_upload_status", ""))
+    if fields.get("gcs_uri"):
+        logger.info("GCS URI: %s", fields["gcs_uri"])
     logger.info(json.dumps(fields, default=str))

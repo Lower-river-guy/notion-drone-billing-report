@@ -140,3 +140,22 @@ def test_billing_month_override():
     assert label == "2026-09"
     assert start == date(2026, 9, 1)
     assert end == date(2026, 9, 30)
+
+
+def test_missing_flight_date_completed_goes_to_review():
+    flights = [
+        _flight(page_id="ok", flight_date=date(2026, 9, 10)),
+        _flight(
+            page_id="no-date",
+            title="— PLACEHOLDER — Completed",
+            flight_date=None,
+            project_relation_ids=[],
+        ),
+    ]
+    billable, review, completed, found = process_flights(
+        flights, date(2026, 9, 1), date(2026, 9, 30)
+    )
+    assert completed == 1
+    assert found == 2
+    assert len(billable) == 1
+    assert any("Missing Flight Date" in item.reason for item in review)

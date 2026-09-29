@@ -218,6 +218,9 @@ def process_flights(
         for f in unique
         if f.flight_date is not None and billing_start <= f.flight_date <= billing_end
     ]
+    missing_date_completed = [
+        f for f in unique if f.status == "Completed" and f.flight_date is None
+    ]
 
     billable: list[BillableFlight] = []
     review: list[ReviewItem] = []
@@ -233,7 +236,13 @@ def process_flights(
         elif r:
             review.append(r)
 
-    return billable, review, completed_in_month, len(in_month)
+    for f in missing_date_completed:
+        _, r = classify_flight(f)
+        if r:
+            review.append(r)
+
+    flights_found = len(in_month) + len(missing_date_completed)
+    return billable, review, completed_in_month, flights_found
 
 
 @dataclass

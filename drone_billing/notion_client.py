@@ -142,7 +142,13 @@ class NotionClient:
 
     def query_database_pages(self) -> list[dict[str, Any]]:
         pages: list[dict[str, Any]] = []
-        payload: dict[str, Any] = {"page_size": 100}
+        payload: dict[str, Any] = {
+            "page_size": 100,
+            "filter": {
+                "property": "Status",
+                "select": {"equals": "Completed"},
+            },
+        }
         while True:
             r = self._client.post(f"/databases/{self.database_id}/query", json=payload)
             r.raise_for_status()

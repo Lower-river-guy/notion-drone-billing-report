@@ -116,12 +116,9 @@ Equivalent manual steps:
 export PROJECT_ID=work-projects-486912
 export REGION=us-west1
 export JOB_NAME=notion-drone-billing-report
-export IMAGE=gcr.io/${PROJECT_ID}/${JOB_NAME}:0.01.00
-
-gcloud builds submit --tag "${IMAGE}" --project "${PROJECT_ID}"
 
 gcloud run jobs deploy "${JOB_NAME}" \
-  --image "${IMAGE}" \
+  --source . \
   --region "${REGION}" \
   --project "${PROJECT_ID}" \
   --set-secrets="NOTION_TOKEN=Notion_Google_Cloud_Sync:latest" \
@@ -129,6 +126,9 @@ gcloud run jobs deploy "${JOB_NAME}" \
   --max-retries=1 \
   --task-timeout=30m
 ```
+The scheduler uses cron `0 2 2 * *` in `America/Los_Angeles` and triggers:
+
+`https://run.googleapis.com/v2/projects/work-projects-486912/locations/us-west1/jobs/notion-drone-billing-report:run`
 
 ### Manual execution
 
