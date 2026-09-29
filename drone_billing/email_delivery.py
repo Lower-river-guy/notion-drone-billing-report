@@ -102,7 +102,7 @@ def build_body(billing_month: str, start: date, end: date) -> str:
         f"- Status = In Process or Completed\n"
         f"- Flight Date within the billing period\n"
         f"\n"
-        f"Sukut Drone Automation\n"
+        f"SUKUT GPS Automation Team\n"
         f"{BANNER}\n"
     )
 

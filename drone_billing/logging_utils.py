@@ -7,7 +7,7 @@ import logging
 import sys
 from typing import Any
 
-BANNER = r"><(((º>            ><(((º>          RK               ><(((º>"
+BANNER = r"><(((º>   ><(((º>   RK   ><(((º>"
 
 
 def configure_logging() -> logging.Logger:

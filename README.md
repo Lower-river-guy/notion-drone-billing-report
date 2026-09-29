@@ -127,7 +127,7 @@ After a successful, validated report (and GCS upload when enabled), the job emai
 - **To:** `rkolt@sukut.com` (override with `REPORT_EMAIL_TO`)
 - **Subject:** `Drone Billing Report - {Month} {Year}` (e.g. `Drone Billing Report - September 2026`)
 - **Attachment:** `Drone_Billing_Report_YYYY-MM.xlsx`
-- **Body:** billing period plus “Status = In Process or Completed” and the RK fish banner
+- **Body:** billing period plus “Status = In Process or Completed”, signed `SUKUT GPS Automation Team` with the RK fish banner (`><(((º>   ><(((º>   RK   ><(((º>`)
 
 Failure during Notion query, month filtering, Excel generation, validation, or GCS upload (when GCS is enabled) skips the normal billing email and exits non-zero.
 

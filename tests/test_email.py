@@ -18,8 +18,14 @@ def test_subject_and_body():
     assert "Please see attached Drone Billing Report for September 2026." in body
     assert "September 1, 2026 through September 30, 2026" in body
     assert "Status = In Process or Completed" in body
-    assert "Sukut Drone Automation" in body
-    assert "><(((º>" in body
+    assert "SUKUT GPS Automation Team" in body
+    assert "Sukut Drone Automation" not in body
+    assert "><(((º>   ><(((º>   RK   ><(((º>" in body
+    assert "><(((º>            ><(((º>          RK               ><(((º>" not in body
+    assert body.endswith(
+        "SUKUT GPS Automation Team\n"
+        "><(((º>   ><(((º>   RK   ><(((º>\n"
+    )
 
 
 def test_email_disabled(monkeypatch, tmp_path: Path):
@@ -52,6 +58,7 @@ def test_send_report_email_uses_attachment(tmp_path: Path, monkeypatch):
         captured["to"] = config.to_address
         captured["from"] = config.from_address
         captured["subject"] = message["Subject"]
+        captured["body"] = message.get_body(preferencelist=("plain",)).get_content()
         captured["filename"] = message.get_payload()[1].get_filename()
 
     status = send_report_email(
@@ -65,6 +72,10 @@ def test_send_report_email_uses_attachment(tmp_path: Path, monkeypatch):
     assert captured["to"] == "rkolt@sukut.com"
     assert captured["subject"] == "Drone Billing Report - September 2026"
     assert captured["filename"] == "Drone_Billing_Report_2026-09.xlsx"
+    assert captured["body"].endswith(
+        "SUKUT GPS Automation Team\n"
+        "><(((º>   ><(((º>   RK   ><(((º>\n"
+    )
 
 
 def test_load_email_config_smtp_aliases(monkeypatch):
