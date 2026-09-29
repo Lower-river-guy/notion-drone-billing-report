@@ -71,16 +71,18 @@ Scheduled and other non-reportable statuses are excluded from the Notion query a
 
 ## Cost tiers
 
-All amounts live in `drone_billing/cost_config.py` (totals and line-item breakdown).
+All amounts live in `drone_billing/cost_config.py` (billed totals and line-item breakdown).
 
 | Acres | Total |
 |-------|-------|
-| 0–200 | $2,442.94 |
+| 0–200 | $2,500.00 |
 | 201–300 | $2,930.68 |
 | 301–500 | $3,805.99 |
 | 501–800 | $6,233.02 |
 | > 800 | Custom estimate (review) |
 | Missing | Review required |
+
+Tier 1 is billed at **$2,500.00** per flight. That is the authoritative charge even though the underlying cost-component line items still sum to $2,442.94.
 
 ## Environment variables
 

@@ -37,10 +37,12 @@ def test_workbook_generation(tmp_path: Path):
     ws = loaded["Monthly Summary"]
     assert ws.cell(row=2, column=1).value == "2026-09"
     assert ws.cell(row=2, column=4).value == 200
-    assert float(ws.cell(row=2, column=7).value) == 2442.94
+    assert float(ws.cell(row=2, column=6).value) == 2500.00
+    assert float(ws.cell(row=2, column=7).value) == 2500.00
 
     detail = loaded["Flight Detail"]
     assert detail.cell(row=2, column=1).value == "2026-09-28"
+    assert float(detail.cell(row=2, column=8).value) == 2500.00
 
 
 def test_review_sheet(tmp_path: Path):

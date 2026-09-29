@@ -98,7 +98,7 @@ def test_billable_flight():
     b, r = classify_flight(f)
     assert b is not None
     assert r is None
-    assert b.cost.total == Decimal("2442.94")
+    assert b.cost.total == Decimal("2500.00")
 
 
 def test_duplicate_page_id_protection():

@@ -43,6 +43,8 @@ class CostTier:
     min_acres: int
     max_acres: int
     line_items: CostLineItems
+    # Amount charged per flight. May differ from line_items.total when a billed
+    # override is in effect (Tier 1 bills $2,500.00 vs $2,442.94 of components).
     billing_total: Decimal
 
     @property
@@ -58,7 +60,8 @@ TIER_1 = CostTier(
     tier_number=1,
     min_acres=0,
     max_acres=200,
-    billing_total=_d("2442.94"),
+    # Authoritative billed amount. Underlying cost components still total 2442.94.
+    billing_total=_d("2500.00"),
     line_items=CostLineItems(
         drone_cost=_d("292.93"),
         aero_points=_d("36.67"),
