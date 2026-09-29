@@ -145,8 +145,10 @@ class NotionClient:
         payload: dict[str, Any] = {
             "page_size": 100,
             "filter": {
-                "property": "Status",
-                "select": {"equals": "Completed"},
+                "or": [
+                    {"property": "Status", "select": {"equals": "Completed"}},
+                    {"property": "Status", "select": {"equals": "In Process"}},
+                ]
             },
         }
         while True:

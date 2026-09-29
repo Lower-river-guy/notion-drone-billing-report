@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 from drone_billing.cost_config import CostResult, cost_for_acres
 
 LA_TZ = ZoneInfo("America/Los_Angeles")
+REPORTABLE_STATUSES = frozenset({"Completed", "In Process"})
 
 REQUIRED_NOTION_PROPERTIES = frozenset(
     {
@@ -135,8 +136,10 @@ def _title_is_placeholder(title: str) -> bool:
 def classify_flight(flight: FlightRecord) -> tuple[BillableFlight | None, ReviewItem | None]:
     reasons: list[str] = []
 
-    if flight.status != "Completed":
+    if flight.status not in REPORTABLE_STATUSES:
         return None, None
+    if flight.status == "In Process":
+        reasons.append("Status is In Process — not billed until Completed")
 
     if _title_is_template(flight.title):
         reasons.append("Title starts with TEMPLATE (not billable)")
@@ -202,47 +205,68 @@ def dedupe_flights_by_page_id(
     return list(seen.values())
 
 
+@dataclass
+class ProcessResult:
+    billable: list[BillableFlight]
+    review: list[ReviewItem]
+    completed_in_month: int
+    in_process_in_month: int
+    flights_found: int
+
+    def __iter__(self):
+        yield self.billable
+        yield self.review
+        yield self.completed_in_month
+        yield self.flights_found
+
+
 def process_flights(
     flights: Iterable[FlightRecord],
     billing_start: date,
     billing_end: date,
-) -> tuple[list[BillableFlight], list[ReviewItem], int, int]:
-    """Filter by month, dedupe, classify.
-
-    Returns billable, review, completed_in_month, flights_in_month.
-    """
+) -> ProcessResult:
+    """Filter by month, dedupe, classify reportable flights."""
     unique = dedupe_flights_by_page_id(flights)
 
     in_month = [
         f
         for f in unique
-        if f.flight_date is not None and billing_start <= f.flight_date <= billing_end
+        if f.status in REPORTABLE_STATUSES
+        and f.flight_date is not None
+        and billing_start <= f.flight_date <= billing_end
     ]
-    missing_date_completed = [
-        f for f in unique if f.status == "Completed" and f.flight_date is None
+    missing_date_reportable = [
+        f for f in unique if f.status in REPORTABLE_STATUSES and f.flight_date is None
     ]
 
     billable: list[BillableFlight] = []
     review: list[ReviewItem] = []
     completed_in_month = 0
+    in_process_in_month = 0
 
     for f in in_month:
-        if f.status != "Completed":
-            continue
-        completed_in_month += 1
+        if f.status == "Completed":
+            completed_in_month += 1
+        elif f.status == "In Process":
+            in_process_in_month += 1
         b, r = classify_flight(f)
         if b:
             billable.append(b)
         elif r:
             review.append(r)
 
-    for f in missing_date_completed:
+    for f in missing_date_reportable:
         _, r = classify_flight(f)
         if r:
             review.append(r)
 
-    flights_found = len(in_month) + len(missing_date_completed)
-    return billable, review, completed_in_month, flights_found
+    return ProcessResult(
+        billable=billable,
+        review=review,
+        completed_in_month=completed_in_month,
+        in_process_in_month=in_process_in_month,
+        flights_found=len(in_month) + len(missing_date_reportable),
+    )
 
 
 @dataclass

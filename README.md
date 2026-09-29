@@ -1,35 +1,42 @@
 # Notion Drone Billing Report
 
-**Version 0.01.00** — Python 3.12 Cloud Run **Job** that reads completed drone flights from Notion, applies tiered internal billing costs from project acreage rollups, and writes a monthly Excel report to local disk or Google Cloud Storage.
+**Version 0.01.01** — Python 3.12 Cloud Run **Job** that reads drone flights from Notion, applies tiered internal billing costs from project acreage rollups, writes a monthly Excel report to local disk or Google Cloud Storage, and emails the workbook after successful generation.
 
 ## Purpose
 
 Automate monthly internal drone billing by:
 
 1. Querying the Notion **Drone Flight Schedule** database via the official REST API (rollup **Acres** requires REST, not Notion SQL).
-2. Billing only **Completed** flights in the target calendar month (default: previous month in `America/Los_Angeles`).
-3. Grouping results by project in an Excel workbook with summary, detail, and review sheets.
-4. Uploading to GCS when configured.
+2. Selecting flights with **Status = In Process or Completed** and **Flight Date** in the target calendar month (default: previous month in `America/Los_Angeles`).
+3. Billing **only Completed** flights. **In Process** flights are listed on Review Required and are **not billed** until Completed. Templates and Scheduled flights are not billed.
+4. Grouping results by project in an Excel workbook with summary, detail, and review sheets.
+5. Uploading to GCS when configured.
+6. Emailing `rkolt@sukut.com` after Notion query, month filter, Excel generation, workbook validation, and GCS upload (when GCS is enabled) all succeed.
 
-Email delivery is stubbed for a future release; report generation does not depend on email.
+If generation fails, the job logs the failure, **does not** send a billing-report email, and exits non-zero.
 
 ## Architecture
 
 ```
-Cloud Scheduler (monthly)
+Cloud Scheduler (2nd of month, 2:00 AM PT)
         │
         ▼
 Cloud Run Job (notion-drone-billing-report)
         │
         ├── Notion REST API ──► Drone Flight Schedule DB
+        │                       Status = In Process OR Completed
+        │                       Flight Date in previous calendar month
         │
-        └── Excel report ──► GCS (or ./output locally)
+        ├── Excel report ──► GCS (trimble-data-bucket-rk)
+        │
+        └── Email ──► rkolt@sukut.com (SMTP after validation)
 ```
 
 - **GCP project:** `work-projects-486912`
 - **Region:** `us-west1`
 - **Job name:** `notion-drone-billing-report`
 - **Scheduler:** `notion-drone-billing-report-monthly` — cron `0 2 2 * *`, timezone `America/Los_Angeles` (2:00 AM on the 2nd; bills the **previous** calendar month)
+- **Example:** Oct 2 2026 2:00 AM PT → September 1–30 2026, attachment `Drone_Billing_Report_2026-09.xlsx`
 
 ## Notion source database
 
@@ -47,18 +54,20 @@ Cloud Run Job (notion-drone-billing-report)
 | Flight Type | select | Detail sheet |
 | Drone Equipment | select | Detail sheet |
 | Acres | rollup (number) | **Source of truth** for tier |
-| Status | select | Only `Completed` is billable |
+| Status | select | Query `In Process` or `Completed`. Only `Completed` is billed. |
 
 At startup the job retrieves the live database schema and **fails** if any required property name is missing.
 
 ### Review required (not billed)
 
-- Status ≠ Completed
+- Status = In Process — not billed until Completed
 - Title starts with `TEMPLATE` (case-insensitive)
 - Title contains `PLACEHOLDER`
 - Missing Acres, Project, or Flight Date
 - Acres > 800 → custom estimate
 - Multiple Project relations
+
+Scheduled and other non-reportable statuses are excluded from the Notion query and are not billed.
 
 ## Cost tiers
 
@@ -84,11 +93,37 @@ All amounts live in `drone_billing/cost_config.py` (totals and line-item breakdo
 | `OUTPUT_DIR` | No | Local output when GCS unset (default: `./output`) |
 | `GCS_BUCKET` | No | If set, upload report (example: `trimble-data-bucket-rk`) |
 | `GCS_PREFIX` | No | Default: `notion-drone-billing-report/` |
+| `REPORT_EMAIL_TO` | No | Default production recipient: `rkolt@sukut.com` |
+| `REPORT_EMAIL_ENABLED` | No | Default `true`. Set `false` to skip sending. |
+| `GMAIL_EMAIL` | Yes if email enabled | SMTP username (Secret Manager). Alias: `SMTP_USER` |
+| `GMAIL_APP_PASSWORD` | Yes if email enabled | SMTP password (Secret Manager). Alias: `SMTP_PASS` |
+| `EMAIL_FROM` | No | Defaults to `GMAIL_EMAIL` |
+| `GMAIL_SMTP_SERVER` / `SMTP_HOST` | No | Default `smtp.gmail.com` |
+| `GMAIL_SMTP_PORT` / `SMTP_PORT` | No | Default `587` STARTTLS |
 
-**Secrets:** Never commit `NOTION_TOKEN`. In GCP the existing Secret Manager secret is:
+SMTP credentials are **never** hard-coded. Do not commit app passwords.
 
-- **Name:** `Notion_Google_Cloud_Sync`
-- **Cloud Run:** `--set-secrets=NOTION_TOKEN=Notion_Google_Cloud_Sync:latest`
+## Email delivery
+
+After a successful, validated report (and GCS upload when enabled), the job emails:
+
+- **To:** `rkolt@sukut.com` (override with `REPORT_EMAIL_TO`)
+- **Subject:** `Drone Billing Report - {Month} {Year}` (e.g. `Drone Billing Report - September 2026`)
+- **Attachment:** `Drone_Billing_Report_YYYY-MM.xlsx`
+- **Body:** billing period plus “Status = In Process or Completed” and the RK fish banner
+
+Failure during Notion query, month filtering, Excel generation, validation, or GCS upload (when GCS is enabled) skips the normal billing email and exits non-zero.
+
+**Secrets:** Never commit `NOTION_TOKEN` or Gmail app passwords. In GCP the expected Secret Manager secrets are:
+
+- **Name:** `Notion_Google_Cloud_Sync` → Cloud Run `NOTION_TOKEN`
+- **Name:** `GMAIL_EMAIL` → Cloud Run `GMAIL_EMAIL` (if the secret exists)
+- **Name:** `GMAIL_APP_PASSWORD` → Cloud Run `GMAIL_APP_PASSWORD` (if the secret exists)
+
+```
+--set-secrets=NOTION_TOKEN=Notion_Google_Cloud_Sync:latest,GMAIL_EMAIL=GMAIL_EMAIL:latest,GMAIL_APP_PASSWORD=GMAIL_APP_PASSWORD:latest
+--set-env-vars=GCS_BUCKET=trimble-data-bucket-rk,GCS_PREFIX=notion-drone-billing-report/,REPORT_EMAIL_TO=rkolt@sukut.com
+```
 
 ## Local testing
 
@@ -97,11 +132,13 @@ python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt pytest
 pytest -q
-cp .env.example .env   # add NOTION_TOKEN for live runs
+cp .env.example .env   # add NOTION_TOKEN; for a live send, add Gmail secrets
 ./scripts/run_local.sh
 ```
 
 Without `GCS_BUCKET`, reports are written to `./output/Drone_Billing_Report_YYYY-MM.xlsx`.
+
+Set `REPORT_EMAIL_ENABLED=false` for a local run that should not send mail.
 
 ## Cloud Run Job deployment
 
@@ -109,6 +146,8 @@ Without `GCS_BUCKET`, reports are written to `./output/Drone_Billing_Report_YYYY
 chmod +x scripts/deploy_cloud_run_job.sh
 ./scripts/deploy_cloud_run_job.sh
 ```
+
+The deploy script maps `NOTION_TOKEN` from `Notion_Google_Cloud_Sync` and, when present, maps `GMAIL_EMAIL` / `GMAIL_APP_PASSWORD` from Secret Manager. It does not hard-code SMTP passwords. Scheduler is created or updated to cron `0 2 2 * *` in `America/Los_Angeles` and is **not** fired by the script.
 
 Equivalent manual steps:
 
@@ -121,31 +160,31 @@ gcloud run jobs deploy "${JOB_NAME}" \
   --source . \
   --region "${REGION}" \
   --project "${PROJECT_ID}" \
-  --set-secrets="NOTION_TOKEN=Notion_Google_Cloud_Sync:latest" \
-  --set-env-vars="GCS_BUCKET=trimble-data-bucket-rk,GCS_PREFIX=notion-drone-billing-report/" \
+  --set-secrets="NOTION_TOKEN=Notion_Google_Cloud_Sync:latest,GMAIL_EMAIL=GMAIL_EMAIL:latest,GMAIL_APP_PASSWORD=GMAIL_APP_PASSWORD:latest" \
+  --set-env-vars="GCS_BUCKET=trimble-data-bucket-rk,GCS_PREFIX=notion-drone-billing-report/,REPORT_EMAIL_TO=rkolt@sukut.com" \
   --max-retries=1 \
   --task-timeout=30m
 ```
+
 The scheduler uses cron `0 2 2 * *` in `America/Los_Angeles` and triggers:
 
 `https://run.googleapis.com/v2/projects/work-projects-486912/locations/us-west1/jobs/notion-drone-billing-report:run`
 
+OAuth service account: `564809734796-compute@developer.gserviceaccount.com`
+
 ### Manual execution
 
-```bash
-gcloud run jobs execute notion-drone-billing-report \
-  --region us-west1 \
-  --project work-projects-486912
-```
-
-Optional billing month override for a single run (if your job template allows env overrides):
+Do **not** run the production scheduler to test. Execute the Cloud Run Job directly, with a billing-month override when needed:
 
 ```bash
 gcloud run jobs execute notion-drone-billing-report \
   --region us-west1 \
   --project work-projects-486912 \
-  --update-env-vars BILLING_MONTH=2026-09
+  --update-env-vars BILLING_MONTH=2026-09 \
+  --wait
 ```
+
+On a date in September, the default previous-month window would be August; pass `BILLING_MONTH=2026-09` for a September report.
 
 ## GCS output
 
@@ -157,7 +196,7 @@ Buckets are not made public.
 
 ## Logging
 
-On startup the job prints the RK fish banner, then JSON structured logs including version, billing month, flight counts, output path, and GCS status.
+On startup the job prints the RK fish banner, then JSON structured logs including version, billing month, completed vs In Process counts, billable vs review, month total, output path, GCS status, and email delivery status.
 
 ## Troubleshooting
 
@@ -165,9 +204,12 @@ On startup the job prints the RK fish banner, then JSON structured logs includin
 |-------|--------|
 | Schema validation error | Property **names** in Notion must match exactly (including `Acres` rollup). |
 | Empty report | Confirm `BILLING_MONTH` and flights’ **Flight Date** in that month. |
+| In Process on Review Required | Expected — billed only when Status is Completed. |
 | Missing acreage | Rollup must return a number via REST API; fix Project relation / project acreage. |
 | 401 from Notion | `NOTION_TOKEN` / `Notion_Google_Cloud_Sync` secret and integration access to the database. |
-| GCS upload failed | Job service account needs `storage.objects.create` on the bucket. |
+| GCS upload failed | Job service account needs `storage.objects.create` on the bucket. Email is not sent. |
+| Email not sent | Confirm `REPORT_EMAIL_ENABLED`, `GMAIL_EMAIL` / `GMAIL_APP_PASSWORD` secrets, and that generation + validation + GCS succeeded. |
+| SMTP credentials missing | Set Secret Manager `GMAIL_EMAIL` and `GMAIL_APP_PASSWORD`; never hard-code them. |
 
 ## License
 

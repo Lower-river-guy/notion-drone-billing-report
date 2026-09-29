@@ -139,3 +139,32 @@ def save_workbook(wb: Workbook, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(path)
     return path
+
+
+REQUIRED_SHEETS = ("Monthly Summary", "Flight Detail", "Review Required")
+
+
+def validate_workbook(path: Path) -> None:
+    """Confirm the generated file is a usable Excel report before upload/email."""
+    if not path.is_file() or path.stat().st_size <= 0:
+        raise RuntimeError(f"Workbook is missing or empty: {path}")
+    from openpyxl import load_workbook
+
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        missing = [name for name in REQUIRED_SHEETS if name not in wb.sheetnames]
+        if missing:
+            raise RuntimeError(f"Workbook missing required sheets: {missing}")
+        summary = wb["Monthly Summary"]
+        headers = [cell.value for cell in next(summary.iter_rows(min_row=1, max_row=1))]
+        if "Billing Month" not in headers or "Total Billing Cost" not in headers:
+            raise RuntimeError("Monthly Summary is missing required columns")
+        found_total = False
+        for row in summary.iter_rows(min_row=2, values_only=True):
+            if row and row[0] == "MONTH TOTAL":
+                found_total = True
+                break
+        if not found_total:
+            raise RuntimeError("Monthly Summary is missing MONTH TOTAL")
+    finally:
+        wb.close()

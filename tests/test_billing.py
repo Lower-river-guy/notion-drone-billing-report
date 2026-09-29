@@ -121,7 +121,7 @@ def test_monthly_grouping_and_multiple_flights_same_project():
     billable, review, completed, found = process_flights(
         flights, date(2026, 9, 1), date(2026, 9, 30)
     )
-    assert found == 3
+    assert found == 2
     assert completed == 2
     assert len(billable) == 2
     assert len(review) == 0
@@ -159,3 +159,22 @@ def test_missing_flight_date_completed_goes_to_review():
     assert found == 2
     assert len(billable) == 1
     assert any("Missing Flight Date" in item.reason for item in review)
+
+
+def test_in_process_goes_to_review_not_billed():
+    flights = [
+        _flight(page_id="done", flight_date=date(2026, 9, 10)),
+        _flight(
+            page_id="wip",
+            status="In Process",
+            flight_date=date(2026, 9, 12),
+            acres=200,
+        ),
+    ]
+    result = process_flights(flights, date(2026, 9, 1), date(2026, 9, 30))
+    assert result.completed_in_month == 1
+    assert result.in_process_in_month == 1
+    assert result.flights_found == 2
+    assert len(result.billable) == 1
+    assert len(result.review) == 1
+    assert "In Process" in result.review[0].reason
