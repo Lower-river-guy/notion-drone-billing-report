@@ -50,6 +50,7 @@ class ReviewItem:
     flight_date: date | None = None
     project_number: str = ""
     project_name: str = ""
+    status: str | None = None
 
 
 @dataclass
@@ -64,6 +65,7 @@ class BillableFlight:
     drone_equipment: str | None
     acres: int
     cost: CostResult
+    status: str = "Completed"
 
 
 def resolve_billing_month(
@@ -138,8 +140,6 @@ def classify_flight(flight: FlightRecord) -> tuple[BillableFlight | None, Review
 
     if flight.status not in REPORTABLE_STATUSES:
         return None, None
-    if flight.status == "In Process":
-        reasons.append("Status is In Process — not billed until Completed")
 
     if _title_is_template(flight.title):
         reasons.append("Title starts with TEMPLATE (not billable)")
@@ -165,6 +165,7 @@ def classify_flight(flight: FlightRecord) -> tuple[BillableFlight | None, Review
             flight_date=flight.flight_date,
             project_number=flight.project_number,
             project_name=flight.project_name,
+            status=flight.status,
         )
 
     cost = cost_for_acres(flight.acres)
@@ -177,6 +178,7 @@ def classify_flight(flight: FlightRecord) -> tuple[BillableFlight | None, Review
             flight_date=flight.flight_date,
             project_number=flight.project_number,
             project_name=flight.project_name,
+            status=flight.status,
         )
 
     assert flight.flight_date is not None
@@ -193,6 +195,7 @@ def classify_flight(flight: FlightRecord) -> tuple[BillableFlight | None, Review
         drone_equipment=flight.drone_equipment,
         acres=flight.acres,
         cost=cost,
+        status=flight.status or "Completed",
     ), None
 
 

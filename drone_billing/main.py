@@ -5,9 +5,10 @@ from __future__ import annotations
 import os
 import sys
 from datetime import datetime
+from decimal import Decimal
 
 from drone_billing import VERSION
-from drone_billing.billing import build_monthly_summary, process_flights, resolve_billing_month
+from drone_billing.billing import process_flights, resolve_billing_month
 from drone_billing.email_delivery import email_enabled, send_report_email
 from drone_billing.logging_utils import configure_logging, log_structured, print_banner
 from drone_billing.notion_client import NotionClient
@@ -38,8 +39,7 @@ def run(now: datetime | None = None) -> int:
             client.close()
 
         processed = process_flights(flights, start, end)
-        summary = build_monthly_summary(billing_month, processed.billable, processed.review)
-        wb = build_workbook(billing_month, summary, processed.billable, processed.review)
+        wb = build_workbook(billing_month, processed.billable, processed.review)
 
         filename = report_filename(billing_month)
         out_path = output_dir() / filename
@@ -52,7 +52,10 @@ def run(now: datetime | None = None) -> int:
             raise RuntimeError(f"GCS upload did not succeed: {upload.gcs_status}")
 
         generation_complete = True
-        month_total = sum((row.total_billing_cost for row in summary), start=0)
+        month_total = sum(
+            (b.cost.total for b in processed.billable if b.cost.total is not None),
+            start=Decimal("0"),
+        )
         email_status = "not attempted"
         if email_enabled():
             email_status = send_report_email(out_path, billing_month, start, end)

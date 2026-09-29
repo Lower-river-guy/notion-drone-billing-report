@@ -101,6 +101,15 @@ def test_billable_flight():
     assert b.cost.total == Decimal("2500.00")
 
 
+def test_in_process_classify_is_billable():
+    f = _flight(status="In Process", acres=200)
+    b, r = classify_flight(f)
+    assert r is None
+    assert b is not None
+    assert b.status == "In Process"
+    assert b.cost.total == Decimal("2500.00")
+
+
 def test_duplicate_page_id_protection():
     flights = [_flight(page_id="same"), _flight(page_id="same")]
     deduped = dedupe_flights_by_page_id(flights)
@@ -161,7 +170,7 @@ def test_missing_flight_date_completed_goes_to_review():
     assert any("Missing Flight Date" in item.reason for item in review)
 
 
-def test_in_process_goes_to_review_not_billed():
+def test_in_process_is_billed_when_complete():
     flights = [
         _flight(page_id="done", flight_date=date(2026, 9, 10)),
         _flight(
@@ -175,6 +184,16 @@ def test_in_process_goes_to_review_not_billed():
     assert result.completed_in_month == 1
     assert result.in_process_in_month == 1
     assert result.flights_found == 2
-    assert len(result.billable) == 1
-    assert len(result.review) == 1
-    assert "In Process" in result.review[0].reason
+    assert len(result.billable) == 2
+    assert len(result.review) == 0
+    wip = next(b for b in result.billable if b.page_id == "wip")
+    assert wip.status == "In Process"
+    assert wip.cost.total == Decimal("2500.00")
+
+
+def test_in_process_missing_acres_goes_to_review():
+    f = _flight(status="In Process", acres=None)
+    b, r = classify_flight(f)
+    assert b is None
+    assert r is not None
+    assert "Missing Acres" in r.reason

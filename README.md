@@ -8,8 +8,8 @@ Automate monthly internal drone billing by:
 
 1. Querying the Notion **Drone Flight Schedule** database via the official REST API (rollup **Acres** requires REST, not Notion SQL).
 2. Selecting flights with **Status = In Process or Completed** and **Flight Date** in the target calendar month (default: previous month in `America/Los_Angeles`).
-3. Billing **only Completed** flights. **In Process** flights are listed on Review Required and are **not billed** until Completed. Templates and Scheduled flights are not billed.
-4. Grouping results by project in an Excel workbook with summary, detail, and review sheets.
+3. Billing flights with **Status = In Process or Completed** when Flight Date is in the billing month and acres/project/date are valid. Templates and Scheduled flights are not billed. Valid In Process rows appear on the main **Billing Report** (they are not review-only).
+4. Grouping flights by project number (then flight date) in an Excel workbook with Billing Report, Flight Detail, and Review Required sheets.
 5. Uploading to GCS when configured.
 6. Emailing `rkolt@sukut.com` after Notion query, month filter, Excel generation, workbook validation, and GCS upload (when GCS is enabled) all succeed.
 
@@ -54,20 +54,35 @@ Cloud Run Job (notion-drone-billing-report)
 | Flight Type | select | Detail sheet |
 | Drone Equipment | select | Detail sheet |
 | Acres | rollup (number) | **Source of truth** for tier |
-| Status | select | Query `In Process` or `Completed`. Only `Completed` is billed. |
+| Status | select | Query `In Process` or `Completed`. Both are billed when acres, date, and project are valid. |
 
 At startup the job retrieves the live database schema and **fails** if any required property name is missing.
 
+### Excel workbook
+
+**Billing Report** (accounting-facing; no Notion page ID/URL):
+
+- Centered title merged across the report width, e.g. `DRONE BILLINGS - September 2026`
+- Blank row under the title, then bold column headers
+- Columns: `PROJECT #`, `PROJECT DESCRIPTION`, `FLIGHT DATE`, `FLIGHT TYPE`, `DRONE`, `ACRES`, `STATUS`, `COST TIER`, `$ BILLED AMOUNT`
+- Sorted and grouped by Project Number, then Flight Date, with one blank row between project groups
+- Dates `MM/DD/YYYY`, acres as a number, dollars with commas and two decimals
+- Landscape print, one page wide, header row repeated on subsequent pages
+- Bold total row: `TOTAL DRONE BILLING` + month total
+
+**Flight Detail** keeps Notion Page ID and URL plus Status.
+
+**Review Required** lists only records that cannot be billed reliably.
+
 ### Review required (not billed)
 
-- Status = In Process — not billed until Completed
 - Title starts with `TEMPLATE` (case-insensitive)
 - Title contains `PLACEHOLDER`
 - Missing Acres, Project, or Flight Date
-- Acres > 800 → custom estimate
+- Acres > 800 → custom estimate (`CUSTOM ESTIMATE REQUIRED`)
 - Multiple Project relations
 
-Scheduled and other non-reportable statuses are excluded from the Notion query and are not billed.
+Valid **In Process** flights (acres, date, and project present, acres ≤ 800) **are billed** on Billing Report. Scheduled and other non-reportable statuses are excluded from the Notion query and are not billed.
 
 ## Cost tiers
 
@@ -206,7 +221,7 @@ On startup the job prints the RK fish banner, then JSON structured logs includin
 |-------|--------|
 | Schema validation error | Property **names** in Notion must match exactly (including `Acres` rollup). |
 | Empty report | Confirm `BILLING_MONTH` and flights’ **Flight Date** in that month. |
-| In Process on Review Required | Expected — billed only when Status is Completed. |
+| Valid In Process not on Billing Report | In Process with acres, date, and project **is billed**. Review Required is only for rows that cannot be billed reliably. |
 | Missing acreage | Rollup must return a number via REST API; fix Project relation / project acreage. |
 | 401 from Notion | `NOTION_TOKEN` / `Notion_Google_Cloud_Sync` secret and integration access to the database. |
 | GCS upload failed | Job service account needs `storage.objects.create` on the bucket. Email is not sent. |
