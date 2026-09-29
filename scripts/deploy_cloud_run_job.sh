@@ -55,7 +55,7 @@ else
   echo "WARNING: No GMAIL_APP_PASSWORD (or alias) secret found. Job email will fail unless credentials are provided another way." >&2
 fi
 
-ENV_VARS="GCS_BUCKET=${GCS_BUCKET},GCS_PREFIX=${GCS_PREFIX},REPORT_EMAIL_TO=${REPORT_EMAIL_TO}"
+ENV_VARS="GCS_BUCKET=${GCS_BUCKET},GCS_PREFIX=${GCS_PREFIX},REPORT_EMAIL_TO=${REPORT_EMAIL_TO},OUTPUT_DIR=/tmp"
 
 echo "Deploying Cloud Run Job ${JOB_NAME} from source..."
 gcloud run jobs deploy "${JOB_NAME}" \

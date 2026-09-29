@@ -9,8 +9,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY drone_billing/ ./drone_billing/
 
+RUN mkdir -p /app/output && chown -R app:app /app
+
 USER app
 
 ENV PYTHONUNBUFFERED=1
+ENV OUTPUT_DIR=/tmp
 
 CMD ["python", "-m", "drone_billing"]
